@@ -1,0 +1,6 @@
+[
+    {
+        "caption": "Markdown Table of Contents: toggle",
+        "command": "md_toc_toggle"
+    }
+]

@@ -1,0 +1,14 @@
+[
+    {
+        "keys": ["ctrl+shift+m"],
+        "command": "md_toc_toggle",
+        "context":
+        [
+            {
+                "key": "selector",
+                "operator": "equal",
+                "operand": "text.html.markdown"
+            }
+        ]
+    }
+]

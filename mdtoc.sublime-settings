@@ -1,0 +1,22 @@
+{
+    // Where to display the Table of Contents
+    // Options: "document_start", "document_end", "after_first_heading", "at_cursor"
+    "toc_position": "after_first_heading",
+
+    // Automatically show Table of Contents when opening a markdown file
+    "show_on_open": false,
+
+    // Update Table of Contents automatically when the document is modified
+    "auto_update": true,
+
+    // When to hide the Table of Contents automatically
+    // Options: "never", "after_navigate", "after_cursor_move"
+    "hide_toc": "after_navigate",
+
+    // Link color for TOC entries
+    // Options: "link" - use theme's link color, "text" - use regular text color
+    "link_color": "text",
+
+    // Indentation width for nested headings
+    "indent_width": 2
+}
