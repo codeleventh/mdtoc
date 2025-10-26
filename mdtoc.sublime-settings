@@ -18,5 +18,9 @@
     "link_color": "text",
 
     // Indentation width for nested headings
-    "indent_width": 2
+    "indent_width": 2,
+
+    // Indentation style
+    // Options: "spaces", "numbers", "bullets", "tree", "none"
+    "indent_style": "spaces"
 }

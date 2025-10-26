@@ -14,6 +14,14 @@ Press `Ctrl+Shift+M` to toggle the Table of Contents or use "Markdown Table of C
 ### Settings
 See the [default settings file](mdtoc.sublime-settings) for available settings and descriptions.
 
+## Changelog
+### 1.1.0
+- Add Table of Contents indentation styles
+- Add dependencies.json
+
+### 1.0.0
+Initial release
+
 ## License
 This project is licensed under the [WTFPL License](http://www.wtfpl.net/):
 > Copyright © 2016 Xiangrong Hao

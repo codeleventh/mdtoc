@@ -12,6 +12,13 @@ class Heading:
         self.position = position
 
 
+class FormattedHeading:
+    def __init__(self, indentation, title, position):
+        self.indentation = indentation
+        self.title = title
+        self.position = position
+
+
 phantoms = {}
 phantom_positions = {}
 
@@ -140,18 +147,131 @@ def is_markdown_file(view):
     return 'markdown' in syntax.lower() or file_name.endswith(('.md', '.markdown'))
 
 
-def generate_toc_html(_, headings):
+def make_indentation(heading, indent_style, indent_width):
+    spaces = "\u00A0" * indent_width * max(heading.level - 1, 0)
+    if indent_style == "spaces":
+        return spaces
+    elif indent_style == "bullets":
+        bullets = ["", "•\u00A0", "◦\u00A0", "▪\u00A0", "♦\u00A0"]
+        bullet = bullets[heading.level - 1]
+        return spaces[:-2] + bullet
+    return " "
+
+
+def make_numbers_indentation(headings, indent_width):
+    formatted_headings = []
+
+    levels = [-1, 0, 0, 0, 0, 0, 0]
+    for index, heading in enumerate(headings):
+        indentation = ""
+
+        levels[heading.level] += 1
+
+        has_prev = index > 0
+        if has_prev and heading.level < headings[index - 1].level:
+            for i in range(heading.level + 1, len(levels)):
+                levels[i] = 0
+
+        for i in range(1, heading.level + 1):
+            indentation += "{}.".format(levels[i])
+        indentation = "\u00A0" * indent_width * max(heading.level - 1, 0) + indentation + "\u00A0"
+
+        formatted_headings.append(FormattedHeading(
+            html.escape(indentation),
+            html.escape(heading.title),
+            heading.position
+        ))
+    return formatted_headings
+
+
+def make_tree_indentation(headings, indent_width):
+    formatted_headings = []
+    ind = max(indent_width, 0)
+
+    active_levels = [False] * 7
+
+    for index, heading in enumerate(headings):
+        indentation = ""
+
+        level = heading.level
+        prev = index - 1
+        next = index + 1
+        prev_level = headings[prev].level if index > 0 else 0
+        next_level = headings[next].level if next < len(headings) else 0
+
+        if prev_level < level - 1:
+            for level in range(prev_level + 1, level):
+                active_levels[level] = True
+
+        for l in range(2, level):
+            if active_levels[l]:
+                indentation += "│\u00A0" + "\u00A0" * ind
+            else:
+                indentation += "\u00A0\u00A0" + "\u00A0" * ind
+
+        if level > 1:
+            has_siblings = False
+            for next_index in range(next, len(headings)):
+                # no fuck were given in making this O(n²)
+                if headings[next_index].level < level:
+                    break
+                if headings[next_index].level == level:
+                    has_siblings = True
+                    break
+
+            if has_siblings:
+                indentation += "├" + "─" * ind + "\u00A0"
+                active_levels[level] = True
+            else:
+                indentation += "└" + "─" * ind + "\u00A0"
+                active_levels[level] = False
+
+        if next_level < level:
+            for i in range(next_level + 1, 7):
+                active_levels[i] = False
+
+        formatted_headings.append(FormattedHeading(
+            html.escape(indentation),
+            html.escape(heading.title),
+            heading.position
+        ))
+
+    return formatted_headings
+
+
+def format_headings(headings):
     settings = sublime.load_settings("mdtoc.sublime-settings")
     indent_width = settings.get("indent_width")
+    indent_style = settings.get("indent_style")
+
+    if indent_style == "tree":
+        return make_tree_indentation(headings, indent_width)
+    if indent_style == "numbers":
+        return make_numbers_indentation(headings, indent_width)
+    else:
+        formatted_headings = []
+        for index, heading in enumerate(headings):
+            formatted_headings.append(
+                FormattedHeading(
+                    make_indentation(heading, indent_style, indent_width),
+                    html.escape(heading.title),
+                    heading.position
+                )
+            )
+        return formatted_headings
+
+
+def generate_toc_html(_, headings):
+    settings = sublime.load_settings("mdtoc.sublime-settings")
+    link_color = settings.get("link_color")
 
     html_parts = []
 
-    link_color = 'var(--foreground)' if settings.get("link_color") == "text" else 'var(--bluish)'
     dynamic_style = '''
             .toc-link {{
                 text-decoration: none;
                 color: {color};
-            }}'''.format(color=link_color)
+            }}'''.format(color='var(--foreground)' if link_color == "text" else 'var(--bluish)')
 
     html_parts.append('''
         <style>
@@ -178,9 +298,10 @@ def generate_toc_html(_, headings):
     html_parts.append(
         '<div class="toc-container"><div class="toc-title">Table of Contents</div><div class="toc-content">')
 
-    for index, heading in enumerate(headings):
-        html_parts.append('<span class="indent">{}</span><a class="toc-link" href="{}">{}</a><br/>'.format(
-            "&nbsp;" * max(heading.level - 1, 0) * indent_width, heading.position, html.escape(heading.title)))
+    formatted_headings = format_headings(headings)
+    for _, heading in enumerate(formatted_headings):
+        html_parts.append('<span class="toc-indent">{}</span><a class="toc-link" href="{}">{}</a><br/>'.format(
+            heading.indentation, heading.position, heading.title))
 
     html_parts.append('</div></div></div>')
 
