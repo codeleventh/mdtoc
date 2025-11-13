@@ -1,6 +1,7 @@
 {
     // Where to display the Table of Contents
     // Options: "document_start", "document_end", "after_first_heading", "at_cursor"
+    // NB: the Table of Contents won't be rendeded at the very start of the document — only after the first line, that's a Sublime Text limitation
     "toc_position": "after_first_heading",
 
     // Automatically show Table of Contents when opening a markdown file

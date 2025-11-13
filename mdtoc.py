@@ -5,23 +5,29 @@ import sublime
 import sublime_plugin
 
 
+ATX_PATTERN = re.compile(r'^(?:>\s*)?(#{1,6})\s+(.+)$')
+#                              ^ Blockquotes can contain other Markdown elements, including headers
+SETEXT_H1_PATTERN = re.compile(r'^=+\s*$')
+SETEXT_H2_PATTERN = re.compile(r'^-+\s*$')
+
+
 class Heading:
-    def __init__(self, title, level, position):
+    def __init__(self, title, level, line_number):
         self.title = title
         self.level = level
-        self.position = position
+        self.line_number = line_number
 
 
 class FormattedHeading:
-    def __init__(self, indentation, title, position):
+    def __init__(self, indentation, title, line_number):
         self.indentation = indentation
         self.title = title
-        self.position = position
+        self.line_number = line_number
 
 
 phantoms = {}
 phantom_positions = {}
-
+prev_html = {}
 
 class MdTocToggleCommand(sublime_plugin.TextCommand):
     def run(self, _):
@@ -42,15 +48,16 @@ class MdTocToggleCommand(sublime_plugin.TextCommand):
 
 
 class MdTocNavigateCommand(sublime_plugin.TextCommand):
-    def run(self, _, point):
+    def run(self, _, line_number):
         view = self.view
 
+        point = view.text_point(line_number, 0)
         view.sel().clear()
         view.sel().add(sublime.Region(point, point))
 
         view.show(point, False)
         # 🩼 waiting for layout to be updated
-        sublime.set_timeout(lambda: view.show_at_center(point), 10)
+        sublime.set_timeout(lambda: view.show_at_center(point), 30)
 
 
 class MdTocListener(sublime_plugin.EventListener):
@@ -66,7 +73,7 @@ class MdTocListener(sublime_plugin.EventListener):
             if headings:
                 show_phantom(view, headings)
 
-    def on_modified_async(self, view):
+    def on_modified(self, view):
         # TODO: the function is kinda laggy on really large files
         settings = sublime.load_settings("mdtoc.sublime-settings")
         auto_update = settings.get("auto_update")
@@ -77,14 +84,10 @@ class MdTocListener(sublime_plugin.EventListener):
         view_id = view.id()
 
         if view_id in phantoms and len(phantoms[view_id].phantoms) > 0:
-            if is_markdown_file(view):
-                headings = parse_headings(view)
-                if headings:
-                    show_phantom(view, headings, is_reposition_needed=False)
-                else:
-                    hide_phantom(view)
+            headings = parse_headings(view)
+            show_phantom(view, headings, is_reposition_needed=False)
 
-    def on_selection_modified_async(self, view):
+    def on_selection_modified(self, view):
         settings = sublime.load_settings("mdtoc.sublime-settings")
         hide_toc = settings.get("hide_toc")
 
@@ -95,22 +98,15 @@ class MdTocListener(sublime_plugin.EventListener):
 
     def on_close(self, view):
         view_id = view.id()
-        if view_id in phantoms:
-            del phantoms[view_id]
-        if view_id in phantom_positions:
-            del phantom_positions[view_id]
+        phantoms.pop(view_id, None)
+        phantom_positions.pop(view_id, None)
+        prev_html.pop(view_id, None)
 
 
 def parse_headings(view):
     # the function doesn't handle ```code blocks``` correctly - according to the specification, all headers
     # inside code blocks should be ignored (but nobody cares, lol)
     headings = []
-
-    atx_pattern = r'^(?:>\s*)?(#{1,6})\s+(.+)$'
-    #                   ^ Blockquotes can contain other Markdown elements, including headers
-    setext_h1_pattern = r'^=+\s*$'
-    setext_h2_pattern = r'^-+\s*$'
-
     ignored_lines = []
 
     def get_setext_heading(setext_region, level):
@@ -123,18 +119,20 @@ def parse_headings(view):
             line_content = view.substr(line_region)
             if line_content.strip():
                 # if not, the next line should be treated as a horizontal rule, not a heading
-                return Heading(line_content, level, line_region.begin())
+                return Heading(line_content, level, row - 1)
         return None
 
-    for region in view.find_all(atx_pattern + "|" + setext_h1_pattern + "|" + setext_h2_pattern):
+    combined_pattern = ATX_PATTERN.pattern + "|" + SETEXT_H1_PATTERN.pattern + "|" + SETEXT_H2_PATTERN.pattern
+    for region in view.find_all(combined_pattern):
         text = view.substr(region)
-        match = re.search(atx_pattern, text)
+        match = ATX_PATTERN.search(text)
         if match:
-            headings.append(Heading(match.group(2), len(match.group(1)), region.begin()))
-        match = re.search(setext_h1_pattern, text)
+            row, _ = view.rowcol(region.begin())
+            headings.append(Heading(match.group(2), len(match.group(1)), row))
+        match = SETEXT_H1_PATTERN.search(text)
         if match:
             headings.append(get_setext_heading(region, 1))
-        match = re.search(setext_h2_pattern, text)
+        match = SETEXT_H2_PATTERN.search(text)
         if match:
             headings.append(get_setext_heading(region, 2))
 
@@ -179,7 +177,7 @@ def make_numbers_indentation(headings, indent_width):
         formatted_headings.append(FormattedHeading(
             html.escape(indentation),
             html.escape(heading.title),
-            heading.position
+            heading.line_number
         ))
     return formatted_headings
 
@@ -212,7 +210,7 @@ def make_tree_indentation(headings, indent_width):
         if level > 1:
             has_siblings = False
             for next_index in range(next, len(headings)):
-                # no fuck were given in making this O(n²)
+                # no fucks were given while making this O(n²)
                 if headings[next_index].level < level:
                     break
                 if headings[next_index].level == level:
@@ -233,7 +231,7 @@ def make_tree_indentation(headings, indent_width):
         formatted_headings.append(FormattedHeading(
             html.escape(indentation),
             html.escape(heading.title),
-            heading.position
+            heading.line_number
         ))
 
     return formatted_headings
@@ -249,16 +247,14 @@ def format_headings(headings):
     if indent_style == "numbers":
         return make_numbers_indentation(headings, indent_width)
     else:
-        formatted_headings = []
-        for index, heading in enumerate(headings):
-            formatted_headings.append(
-                FormattedHeading(
-                    make_indentation(heading, indent_style, indent_width),
-                    html.escape(heading.title),
-                    heading.position
-                )
+        return [
+            FormattedHeading(
+                make_indentation(heading, indent_style, indent_width),
+                html.escape(heading.title),
+                heading.line_number
             )
-        return formatted_headings
+            for heading in headings
+        ]
 
 
 def generate_toc_html(_, headings):
@@ -299,9 +295,9 @@ def generate_toc_html(_, headings):
         '<div class="toc-container"><div class="toc-title">Table of Contents</div><div class="toc-content">')
 
     formatted_headings = format_headings(headings)
-    for _, heading in enumerate(formatted_headings):
+    for heading in formatted_headings:
         html_parts.append('<span class="toc-indent">{}</span><a class="toc-link" href="{}">{}</a><br/>'.format(
-            heading.indentation, heading.position, heading.title))
+            heading.indentation, heading.line_number, heading.title))
 
     html_parts.append('</div></div></div>')
 
@@ -314,9 +310,9 @@ def calc_phantom_position(view, headings):
 
     if position == "document_end":
         return view.size()
-    elif position == "after_first_heading" and len(headings) > 0:
+    elif position == "after_first_heading" and headings:
         first_heading = headings[0]
-        line_region = view.line(first_heading.position)
+        line_region = view.line(view.text_point(first_heading.line_number, 0))
         return line_region.end()
     elif position == "at_cursor":
         return view.sel()[0].begin() if len(view.sel()) > 0 else 0
@@ -332,6 +328,10 @@ def show_phantom(view, headings, is_reposition_needed=True):
     phantom_set = phantoms[view_id]
 
     html_content = generate_toc_html(view, headings)
+    if not is_reposition_needed and prev_html[view_id] == html_content:
+        return
+    prev_html[view_id] = html_content
+
     if is_reposition_needed or view_id not in phantom_positions:
         position = calc_phantom_position(view, headings)
         phantom_positions[view_id] = position
@@ -351,8 +351,7 @@ def hide_phantom(view):
     view_id = view.id()
     if view_id in phantoms:
         phantoms[view_id].update([])
-    if view_id in phantom_positions:
-        del phantom_positions[view_id]
+    phantom_positions.pop(view_id, None)
 
 
 def handle_toc_click(view, href):
@@ -360,8 +359,8 @@ def handle_toc_click(view, href):
     hide_toc = settings.get("hide_toc")
 
     try:
-        point = int(href)
-        view.run_command('md_toc_navigate', {'point': point})
+        line_number = int(href)
+        view.run_command('md_toc_navigate', {'line_number': line_number})
 
         if hide_toc != "never":
             hide_phantom(view)

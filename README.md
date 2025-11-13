@@ -15,6 +15,9 @@ Press `Ctrl+Shift+M` to toggle the Table of Contents or use "Markdown Table of C
 See the [default settings file](mdtoc.sublime-settings) for available settings and descriptions.
 
 ## Changelog
+### 1.2.0
+- Significantly reduce excessive redraws
+
 ### 1.1.0
 - Add Table of Contents indentation styles
 - Add dependencies.json
