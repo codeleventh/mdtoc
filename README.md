@@ -2,14 +2,14 @@
 
 A Sublime Text plugin that shows a Table of Contents for Markdown files with clickable entries.
 
-![](./docs/example.png)
+![](https://gist.githubusercontent.com/codeleventh/a6b2ce4bf933c1689376ed0100111e85/raw/5226eade07ebba5cad81439a00dcddddd57bf02b/mdtoc-example.png)
 
 ## Installation
 Clone the repository under your Packages directory (`~/Library/Application Support/Sublime Text/Packages`, `%APPDATA%\Sublime Text\Packages` or `~/.config/sublime-text/Packages`).  
 (The plugin files should be located in `Packages/mdtoc` directory)
 
 ## Usage
-Press `Ctrl+Shift+M` to toggle the Table of Contents or use "Markdown Table of Contents: toggle" Command Palette entry.
+Use "Markdown Table of Contents: toggle" Command Palette entry or set a shortcut for "md_toc_toggle" command.
 
 ### Settings
 See the [default settings file](mdtoc.sublime-settings) for available settings and descriptions.
