@@ -299,7 +299,7 @@ def generate_toc_html(_, headings):
         html_parts.append('<span class="toc-indent">{}</span><a class="toc-link" href="{}">{}</a><br/>'.format(
             heading.indentation, heading.line_number, heading.title))
 
-    html_parts.append('</div></div></div>')
+    html_parts.append('</div></div>')
 
     return ''.join(html_parts)
 

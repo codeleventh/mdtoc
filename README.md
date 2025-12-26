@@ -15,6 +15,9 @@ Use "Markdown Table of Contents: toggle" Command Palette entry or set a shortcut
 See the [default settings file](mdtoc.sublime-settings) for available settings and descriptions.
 
 ## Changelog
+### 1.2.1
+- Minor unclosed tag bugfix
+
 ### 1.2.0
 - Significantly reduce excessive redraws
 
