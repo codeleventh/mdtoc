@@ -7,8 +7,6 @@ import sublime_plugin
 
 ATX_PATTERN = re.compile(r'^(?:>\s*)?(#{1,6})\s+(.+)$')
 #                              ^ Blockquotes can contain other Markdown elements, including headers
-SETEXT_H1_PATTERN = re.compile(r'^=+\s*$')
-SETEXT_H2_PATTERN = re.compile(r'^-+\s*$')
 
 
 class Heading:
@@ -104,39 +102,27 @@ class MdTocListener(sublime_plugin.EventListener):
 
 
 def parse_headings(view):
-    # the function doesn't handle ```code blocks``` correctly - according to the specification, all headers
-    # inside code blocks should be ignored (but nobody cares, lol)
     headings = []
-    ignored_lines = []
+    for region in view.find_by_selector("markup.heading"):
+        scope = view.scope_name(region.begin())
+        for level in range(1, 7):
+            if "markup.heading.{}".format(level) in scope:
+                break
+        else:
+            continue
 
-    def get_setext_heading(setext_region, level):
-        row, _ = view.rowcol(setext_region.begin())
-        if row > 0 and row - 1 not in ignored_lines:
-            line_region = view.line(view.text_point(row - 1, 0))
-            ignored_lines.append(row)
-            # a line can't be both a text and directive - we need to skip it when processing
-            # the next line (it might be a setext header too)
-            line_content = view.substr(line_region)
-            if line_content.strip():
-                # if not, the next line should be treated as a horizontal rule, not a heading
-                return Heading(line_content, level, row - 1)
-        return None
+        row, _ = view.rowcol(region.begin())
+        line_region = view.line(view.text_point(row, 0))
+        line_text = view.substr(line_region).strip()
+        if not line_text:
+            continue
 
-    combined_pattern = ATX_PATTERN.pattern + "|" + SETEXT_H1_PATTERN.pattern + "|" + SETEXT_H2_PATTERN.pattern
-    for region in view.find_all(combined_pattern):
-        text = view.substr(region)
-        match = ATX_PATTERN.search(text)
-        if match:
-            row, _ = view.rowcol(region.begin())
-            headings.append(Heading(match.group(2), len(match.group(1)), row))
-        match = SETEXT_H1_PATTERN.search(text)
-        if match:
-            headings.append(get_setext_heading(region, 1))
-        match = SETEXT_H2_PATTERN.search(text)
-        if match:
-            headings.append(get_setext_heading(region, 2))
+        atx_match = ATX_PATTERN.match(line_text)
+        title = atx_match.group(2).strip() if atx_match else line_text
 
-    return list(filter(None, headings))
+        headings.append(Heading(title, level, row))
+
+    return headings
 
 
 def is_markdown_file(view):
