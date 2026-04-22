@@ -17,7 +17,7 @@
                                 "command": "edit_settings",
                                 "args":
                                 {
-                                    "base_file": "${packages}/mdtoc/mdtoc.sublime-settings"
+                                    "base_file": "${packages}/Markdown Table of Contents/mdtoc.sublime-settings"
                                 }
                             },
                             {
@@ -25,10 +25,10 @@
                                 "command": "edit_settings",
                                 "args":
                                 {
-                                    "base_file": "${packages}/mdtoc/Default.sublime-keymap",
+                                    "base_file": "${packages}/Markdown Table of Contents/Default.sublime-keymap"
                                 }
                             }
-                            ]
+                        ]
                     }
                 ]
             }
